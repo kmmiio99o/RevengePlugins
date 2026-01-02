@@ -14,7 +14,7 @@ const { TableRowGroup, TableRow, Stack } = findByProps(
   "TableRow"
 );
 
-const getToken = findByProps("getToken").getToken;
+const APIUtils = findByProps("getAPIBaseURL", "get", "post", "del");
 
 const HOUSES = [
   {
@@ -36,46 +36,40 @@ const HOUSES = [
   },
 ];
 
-function applyHypeSquad(value: number) {
-  const token = getToken();
-  if (!token) return showToast("Failed to get token", getAssetIDByName("Small"));
+function request(method: "POST" | "DELETE", body?: any) {
+  if (method === "POST") {
+    return APIUtils.post({
+      url: "/hypesquad/online",
+      body
+    });
+  }
 
+  return APIUtils.del({
+    url: "/hypesquad/online"
+  });
+}
+
+async function applyHypeSquad(value: number) {
   if (![0, 1, 2, 3].includes(value)) {
     showToast("Only 0-3 allowed", getAssetIDByName("Small"));
     return;
   }
 
-  if (value === 0) {
-    fetch("https://discord.com/api/v9/hypesquad/online", {
-      method: "DELETE",
-      headers: { Authorization: token },
-    })
-      .then(res =>
-        showToast(
-          res.ok ? "HypeSquad badge removed" : `Failed: ${res.status}`,
-          getAssetIDByName(res.ok ? "Check" : "Small")
-        )
-      )
-      .catch(e => showToast(`Error: ${e.message}`, getAssetIDByName("Small")));
-    return;
-  }
+  try {
+    if (value === 0) {
+      const res = await request("DELETE");
+      const ok = res && ((res as any).status === 204 || (res as any).ok);
+      showToast(ok ? "HypeSquad badge removed" : `Failed: ${(res as any)?.status ?? "unknown"}`, getAssetIDByName(ok ? "Check" : "Small"));
+      return;
+    }
 
-  const house = HOUSES.find(h => h.id === value);
-  fetch("https://discord.com/api/v9/hypesquad/online", {
-    method: "POST",
-    headers: {
-      Authorization: token,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ house_id: value }),
-  })
-    .then(res =>
-      showToast(
-        res.ok ? `Joined House ${house?.name}!` : `Failed: ${res.status}`,
-        getAssetIDByName(res.ok ? "Check" : "Small")
-      )
-    )
-    .catch(e => showToast(`Error: ${e.message}`, getAssetIDByName("Small")));
+    const house = HOUSES.find(h => h.id === value);
+    const res = await request("POST", { house_id: value });
+    const ok = res && ((res as any).status === 204 || (res as any).ok);
+    showToast(ok ? `Joined House ${house?.name}!` : `Failed: ${(res as any)?.status ?? "unknown"}`, getAssetIDByName(ok ? "Check" : "Small"));
+  } catch (e) {
+    showToast(`Error: ${(e as any)?.message ?? String(e)}`, getAssetIDByName("Small"));
+  }
 }
 
 function HouseSelectorPage() {
